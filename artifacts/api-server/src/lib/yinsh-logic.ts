@@ -131,7 +131,8 @@ function findRows(board: Record<string, CellContent>, player: Player): Array<Arr
 
     const { q, r } = parseKey(key);
 
-    for (const dir of HEX_DIRECTIONS.slice(0, 3)) {
+    // Scan the three unique line directions for axial hex coordinates.
+    for (const dir of [{ q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 }]) {
       const row: HexCoord[] = [{ q, r }];
 
       for (let i = 1; i < 5; i++) {

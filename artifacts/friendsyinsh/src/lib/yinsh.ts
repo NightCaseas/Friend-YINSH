@@ -3,7 +3,7 @@ export type RingPlacement = { color: PlayerColor; q: number; r: number };
 export type MarkerPlacement = { color: PlayerColor; q: number; r: number };
 export type HexCoord = { q: number; r: number };
 
-export type GamePhase = "setup" | "playing" | "rowRemovalRing" | "rowRemovalMarkers" | "finished";
+export type GamePhase = "setup" | "playing" | "row-removal" | "ring-removal" | "finished";
 
 export interface GameState {
   phase: GamePhase;

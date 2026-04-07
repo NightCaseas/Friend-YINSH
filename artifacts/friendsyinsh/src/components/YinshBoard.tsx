@@ -93,6 +93,7 @@ export default function YinshBoard({
     if (pendingRowCells.has(key)) return "rgba(245, 158, 11, 0.35)";
     if (allPendingRowCells.has(key)) return "rgba(245, 158, 11, 0.15)";
     if (isValidDest(q, r)) return "rgba(245, 158, 11, 0.12)";
+    if (state.phase === "row-removal" || state.phase === "ring-removal") return "rgba(30, 38, 55, 0.95)";
     return "rgba(30, 38, 55, 0.85)";
   }
 

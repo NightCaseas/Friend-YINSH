@@ -43,7 +43,7 @@ function serverStateToClientState(ss: ServerGameState): GameState {
   }
 
   return {
-    phase: ss.phase === "row-removal" ? "rowRemovalRing" : ss.phase === "ring-removal" ? "rowRemovalRing" : ss.phase as "setup" | "playing" | "rowRemovalRing" | "rowRemovalMarkers" | "finished",
+    phase: ss.phase,
     turn: ss.currentPlayer,
     rings,
     markers,

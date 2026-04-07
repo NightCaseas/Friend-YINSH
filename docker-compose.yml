@@ -1,0 +1,38 @@
+services:
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    environment:
+      PORT: 3003
+      BASE_PATH: /
+      API_HOST: api
+      API_PORT: 3004
+    depends_on:
+      - api
+    ports:
+      - "3003:3003"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/friend_yinsh
+      PORT: 3004
+    depends_on:
+      - db
+    ports:
+      - "3004:3004"
+
+volumes:
+  db_data:

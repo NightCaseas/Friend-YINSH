@@ -1,0 +1,7 @@
+FROM postgres:16-bookworm
+
+ENV POSTGRES_DB=friend_yinsh
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_PASSWORD=postgres
+
+EXPOSE 5432
