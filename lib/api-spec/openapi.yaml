@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: FriendsYINSH API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: games
+    description: Game room operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /games:
+    post:
+      operationId: createGame
+      tags: [games]
+      summary: Create a new game room
+      responses:
+        "201":
+          description: Game room created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameRoom"
+  /games/{roomId}:
+    get:
+      operationId: getGame
+      tags: [games]
+      summary: Get game room state
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Game room state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameRoom"
+        "404":
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +71,33 @@ components:
           type: string
       required:
         - status
-
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    GameRoom:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [waiting, playing, finished]
+        createdAt:
+          type: string
+        currentPlayer:
+          type: ["string", "null"]
+        winner:
+          type: ["string", "null"]
+        gameState:
+          type: ["string", "null"]
+      required:
+        - id
+        - status
+        - createdAt
+        - currentPlayer
+        - winner
+        - gameState
