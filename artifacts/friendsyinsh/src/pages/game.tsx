@@ -1,13 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGetGame } from "@workspace/api-client-react";
 import YinshBoard from "@/components/YinshBoard";
 import { useWebSocket } from "@/lib/websocket";
 import {
   createInitialState,
-  findRows,
   getEntityAt,
-  isValidCell,
   type GameState,
   type HexCoord,
   type PlayerColor,
@@ -74,8 +72,8 @@ export default function Game() {
   const [highlightRow, setHighlightRow] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const wsRef = useRef<{ send: (d: unknown) => void } | null>(null);
   const joinedRef = useRef(false);
+  const myColorRef = useRef<PlayerColor | null>(null);
 
   const { data: gameData } = useGetGame(roomId, {
     query: { enabled: !!roomId },
@@ -87,44 +85,41 @@ export default function Game() {
     return `${proto}//${window.location.host}/ws`;
   })();
 
-  const handleMessage = useCallback(
-    (data: unknown) => {
-      const msg = data as {
-        type: string;
-        gameState?: ServerGameState;
-        currentPlayer?: PlayerColor;
-        status?: string;
-        winner?: PlayerColor | null;
-        playerRole?: PlayerColor;
-        message?: string;
-      };
+  function handleMessage(data: unknown) {
+    const msg = data as {
+      type: string;
+      gameState?: ServerGameState;
+      currentPlayer?: PlayerColor;
+      status?: string;
+      winner?: PlayerColor | null;
+      playerRole?: PlayerColor;
+      message?: string;
+    };
 
-      if (msg.type === "state") {
-        if (msg.playerRole && !myColor) {
-          setMyColor(msg.playerRole);
-        }
-        if (msg.status) setRoomStatus(msg.status as "waiting" | "playing" | "finished");
-        if (msg.winner !== undefined) setWinner(msg.winner ?? null);
-
-        if (msg.gameState) {
-          const gs = msg.gameState;
-          setServerPhase(gs.phase);
-          setServerPendingRows(gs.pendingRows ?? []);
-          setServerPendingRowPlayer(gs.pendingRowPlayer ?? null);
-          const clientState = serverStateToClientState(gs);
-          setGameState(clientState);
-        }
+    if (msg.type === "state") {
+      if (msg.playerRole && !myColorRef.current) {
+        myColorRef.current = msg.playerRole;
+        setMyColor(msg.playerRole);
       }
+      if (msg.status) setRoomStatus(msg.status as "waiting" | "playing" | "finished");
+      if (msg.winner !== undefined) setWinner(msg.winner ?? null);
 
-      if (msg.type === "error") {
-        toast({ title: "Error", description: msg.message ?? "Unknown error", variant: "destructive" });
+      if (msg.gameState) {
+        const gs = msg.gameState;
+        setServerPhase(gs.phase);
+        setServerPendingRows(gs.pendingRows ?? []);
+        setServerPendingRowPlayer(gs.pendingRowPlayer ?? null);
+        const clientState = serverStateToClientState(gs);
+        setGameState(clientState);
       }
-    },
-    [myColor, toast]
-  );
+    }
+
+    if (msg.type === "error") {
+      toast({ title: "Error", description: msg.message ?? "Unknown error", variant: "destructive" });
+    }
+  }
 
   const { send, state: wsState } = useWebSocket(wsUrl, handleMessage);
-  wsRef.current = { send };
 
   useEffect(() => {
     if (wsState === "connected" && roomId && !joinedRef.current) {
@@ -134,7 +129,7 @@ export default function Game() {
   }, [wsState, roomId, send]);
 
   function sendMove(move: object) {
-    wsRef.current?.send({ type: "move", roomId, move });
+    send({ type: "move", roomId, move });
   }
 
   function handleCellClick(q: number, r: number) {
