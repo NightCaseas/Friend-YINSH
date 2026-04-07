@@ -7,7 +7,7 @@ import { logger } from "./logger.js";
 
 interface RoomClient {
   ws: WebSocket;
-  role: Player | null;
+  role: Player;
   roomId: string;
 }
 
@@ -20,11 +20,11 @@ function getClientsForRoom(roomId: string): Set<RoomClient> {
   return rooms.get(roomId)!;
 }
 
-function broadcast(roomId: string, message: object, except?: WebSocket): void {
+function broadcast(roomId: string, message: object): void {
   const clients = getClientsForRoom(roomId);
   const payload = JSON.stringify(message);
   for (const client of clients) {
-    if (client.ws !== except && client.ws.readyState === WebSocket.OPEN) {
+    if (client.ws.readyState === WebSocket.OPEN) {
       client.ws.send(payload);
     }
   }
@@ -34,14 +34,6 @@ function sendTo(client: RoomClient, message: object): void {
   if (client.ws.readyState === WebSocket.OPEN) {
     client.ws.send(JSON.stringify(message));
   }
-}
-
-function assignRole(roomId: string): Player {
-  const clients = getClientsForRoom(roomId);
-  const existingRoles = new Set([...clients].map(c => c.role).filter(Boolean));
-  if (!existingRoles.has("white")) return "white";
-  if (!existingRoles.has("black")) return "black";
-  return "white";
 }
 
 export function attachWebSocketServer(server: Server): void {
@@ -55,8 +47,8 @@ export function attachWebSocketServer(server: Server): void {
         const msg = JSON.parse(raw.toString());
 
         if (msg.type === "join") {
-          const { roomId } = msg;
-          if (!roomId) return;
+          const { roomId, color } = msg as { roomId: string; color: string };
+          if (!roomId || (color !== "white" && color !== "black")) return;
 
           const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, roomId));
           if (!game) {
@@ -64,37 +56,42 @@ export function attachWebSocketServer(server: Server): void {
             return;
           }
 
-          const role = assignRole(roomId);
-          const client: RoomClient = { ws, role: role as Player, roomId };
-          roomClient = client;
-          getClientsForRoom(roomId).add(client);
-
-          let gameState = game.gameState ? JSON.parse(game.gameState) : createInitialState();
-
-          if (game.status === "waiting") {
-            if (role === "black") {
-              await db.update(gamesTable).set({ status: "playing" }).where(eq(gamesTable.id, roomId));
-              broadcast(roomId, {
-                type: "state",
-                gameState,
-                currentPlayer: gameState.currentPlayer,
-                status: "playing",
-                winner: null,
-                playerRole: "white",
-              }, ws);
-            }
+          const clients = getClientsForRoom(roomId);
+          const colorTaken = [...clients].some(c => c.role === color);
+          if (colorTaken) {
+            ws.send(JSON.stringify({ type: "error", message: "This color is already in use" }));
+            return;
           }
 
-          sendTo(client, {
-            type: "state",
-            gameState,
-            currentPlayer: gameState.currentPlayer,
-            status: role === "black" ? "playing" : game.status,
-            winner: game.winner,
-            playerRole: role,
-          });
+          const client: RoomClient = { ws, role: color as Player, roomId };
+          roomClient = client;
+          clients.add(client);
 
-          logger.info({ roomId, role }, "Client joined room");
+          const gameState = game.gameState ? JSON.parse(game.gameState) : createInitialState();
+
+          const presentRoles = new Set([...clients].map(c => c.role));
+          const bothPresent = presentRoles.has("white") && presentRoles.has("black");
+
+          if (bothPresent && game.status === "waiting") {
+            await db.update(gamesTable).set({ status: "playing" }).where(eq(gamesTable.id, roomId));
+            broadcast(roomId, {
+              type: "state",
+              gameState,
+              currentPlayer: gameState.currentPlayer,
+              status: "playing",
+              winner: null,
+            });
+          } else {
+            sendTo(client, {
+              type: "state",
+              gameState,
+              currentPlayer: gameState.currentPlayer,
+              status: game.status,
+              winner: game.winner ?? null,
+            });
+          }
+
+          logger.info({ roomId, role: color }, "Client joined room");
           return;
         }
 
@@ -126,17 +123,35 @@ export function attachWebSocketServer(server: Server): void {
 
           await db.update(gamesTable).set(updates).where(eq(gamesTable.id, roomId));
 
-          const stateMsg = {
+          broadcast(roomId, {
             type: "state",
             gameState: newState,
             currentPlayer: newState.currentPlayer,
             status: newState.winner ? "finished" : "playing",
-            winner: newState.winner,
-          };
-
-          broadcast(roomId, stateMsg);
+            winner: newState.winner ?? null,
+          });
           return;
         }
+
+        if (msg.type === "resign") {
+          if (!roomClient) return;
+          const { roomId } = msg as { roomId: string };
+
+          const opponentColor: Player = roomClient.role === "white" ? "black" : "white";
+          await db.update(gamesTable)
+            .set({ status: "finished", winner: opponentColor })
+            .where(eq(gamesTable.id, roomId));
+
+          broadcast(roomId, {
+            type: "state",
+            gameState: null,
+            currentPlayer: opponentColor,
+            status: "finished",
+            winner: opponentColor,
+          });
+          return;
+        }
+
       } catch (err) {
         logger.error({ err }, "WebSocket message error");
       }

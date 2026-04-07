@@ -57,23 +57,26 @@ function serverStateToClientState(ss: ServerGameState): GameState {
 }
 
 export default function Game() {
-  const [, params] = useRoute("/game/:roomId");
+  const [, params] = useRoute("/game/:roomId/:color");
   const [, setLocation] = useLocation();
   const roomId = params?.roomId ?? "";
+  const colorParam = params?.color;
+  const myColor: PlayerColor | null =
+    colorParam === "white" || colorParam === "black" ? colorParam : null;
+  const opponentColor: PlayerColor | null =
+    myColor === "white" ? "black" : myColor === "black" ? "white" : null;
   const { toast } = useToast();
 
   const [gameState, setGameState] = useState<GameState>(createInitialState());
   const [serverPhase, setServerPhase] = useState<string>("setup");
   const [serverPendingRows, setServerPendingRows] = useState<HexCoord[][]>([]);
   const [serverPendingRowPlayer, setServerPendingRowPlayer] = useState<PlayerColor | null>(null);
-  const [myColor, setMyColor] = useState<PlayerColor | null>(null);
   const [roomStatus, setRoomStatus] = useState<"waiting" | "playing" | "finished">("waiting");
   const [winner, setWinner] = useState<PlayerColor | null>(null);
   const [highlightRow, setHighlightRow] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
   const joinedRef = useRef(false);
-  const myColorRef = useRef<PlayerColor | null>(null);
 
   const { data: gameData } = useGetGame(roomId, {
     query: { enabled: !!roomId },
@@ -92,15 +95,10 @@ export default function Game() {
       currentPlayer?: PlayerColor;
       status?: string;
       winner?: PlayerColor | null;
-      playerRole?: PlayerColor;
       message?: string;
     };
 
     if (msg.type === "state") {
-      if (msg.playerRole && !myColorRef.current) {
-        myColorRef.current = msg.playerRole;
-        setMyColor(msg.playerRole);
-      }
       if (msg.status) setRoomStatus(msg.status as "waiting" | "playing" | "finished");
       if (msg.winner !== undefined) setWinner(msg.winner ?? null);
 
@@ -122,11 +120,11 @@ export default function Game() {
   const { send, state: wsState } = useWebSocket(wsUrl, handleMessage);
 
   useEffect(() => {
-    if (wsState === "connected" && roomId && !joinedRef.current) {
+    if (wsState === "connected" && roomId && myColor && !joinedRef.current) {
       joinedRef.current = true;
-      send({ type: "join", roomId });
+      send({ type: "join", roomId, color: myColor });
     }
-  }, [wsState, roomId, send]);
+  }, [wsState, roomId, myColor, send]);
 
   function sendMove(move: object) {
     send({ type: "move", roomId, move });
@@ -205,12 +203,16 @@ export default function Game() {
   }
 
   function handleResign() {
-    sendMove({ type: "resign" });
+    send({ type: "resign", roomId });
   }
 
+  const opponentLink =
+    typeof window !== "undefined" && opponentColor
+      ? window.location.href.replace(`/${myColor}`, `/${opponentColor}`)
+      : "";
+
   async function handleCopyLink() {
-    const url = window.location.href;
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(opponentLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -252,10 +254,10 @@ export default function Game() {
   const myRingsCaptured = myColor === "white" ? whiteRingsCaptured : blackRingsCaptured;
   const opRingsCaptured = myColor === "white" ? blackRingsCaptured : whiteRingsCaptured;
 
-  if (!roomId) {
+  if (!roomId || !myColor) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">Invalid room.</p>
+        <p className="text-muted-foreground">Invalid link. Please go back to the home page.</p>
       </div>
     );
   }
@@ -449,10 +451,13 @@ export default function Game() {
                   Waiting for opponent
                 </div>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  Share this link with your friend to start the game.
+                  You play <span className="font-semibold capitalize"
+                    style={{ color: "hsl(38, 92%, 55%)" }}>{myColor}</span>.
+                  Send this link to your friend so they can join as{" "}
+                  <span className="font-semibold capitalize">{opponentColor}</span>:
                 </p>
                 <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground font-mono break-all select-all">
-                  {typeof window !== "undefined" ? window.location.href : ""}
+                  {opponentLink}
                 </div>
                 <button
                   onClick={handleCopyLink}
@@ -463,7 +468,7 @@ export default function Game() {
                     color: "hsl(220, 25%, 8%)",
                   }}
                 >
-                  {copied ? "Copied!" : "Copy link"}
+                  {copied ? "Copied!" : "Copy friend's link"}
                 </button>
               </div>
             </div>

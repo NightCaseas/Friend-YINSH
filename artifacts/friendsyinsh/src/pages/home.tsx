@@ -13,7 +13,8 @@ export default function Home() {
       {},
       {
         onSuccess: (room) => {
-          setLocation(`/game/${room.id}`);
+          const myColor = Math.random() < 0.5 ? "white" : "black";
+          setLocation(`/game/${room.id}/${myColor}`);
         },
         onError: () => {
           setError("Could not create a game. Please try again.");
