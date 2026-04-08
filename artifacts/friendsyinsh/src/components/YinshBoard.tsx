@@ -83,7 +83,7 @@ export default function YinshBoard({
   const vbW = maxX - minX;
   const vbH = maxY - minY;
 
-  const isMyTurn = myColor === state.currentPlayer;
+  const isMyTurn = myColor === state.turn;
   const isSelected = (q: number, r: number) =>
     state.selectedRing?.q === q && state.selectedRing?.r === r;
   const isValidDest = (q: number, r: number) => validMoves.has(`${q},${r}`);

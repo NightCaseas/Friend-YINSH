@@ -54,7 +54,19 @@ export default function Home() {
               opacity: createGame.isPending ? 0.7 : 1,
             }}
           >
-            {createGame.isPending ? "Creating..." : "Create game"}
+            {createGame.isPending ? "Creating..." : "Create Online Game"}
+          </button>
+
+          <button
+            onClick={() => setLocation("/play")}
+            className="w-full py-4 px-8 rounded-lg text-base font-semibold border-2 transition-all duration-200"
+            style={{
+              borderColor: "hsl(142, 76%, 36%)",
+              color: "hsl(142, 76%, 36%)",
+              backgroundColor: "transparent",
+            }}
+          >
+            More Game Modes
           </button>
 
           {error && (
@@ -67,6 +79,9 @@ export default function Home() {
         <div className="text-sm text-muted-foreground space-y-2 leading-relaxed">
           <p>Create a room and share the link with your friend.</p>
           <p>First to capture 3 rings wins.</p>
+          <p className="pt-2 text-emerald-400">
+            Try our new <strong>Hot-Seat mode</strong> for playing on the same device!
+          </p>
         </div>
       </div>
     </div>

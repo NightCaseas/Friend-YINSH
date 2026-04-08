@@ -10,6 +10,12 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management operations
+  - name: friends
+    description: Friends management operations
   - name: games
     description: Game room operations
 paths:
@@ -62,6 +68,448 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  
+  # Authentication endpoints
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: User with email or username already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Account inactive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout user
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  # User endpoints
+  /users/me:
+    get:
+      operationId: getCurrentUser
+      tags: [users]
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    
+    patch:
+      operationId: updateProfile
+      tags: [users]
+      summary: Update user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  /users/{userId}:
+    get:
+      operationId: getUserProfile
+      tags: [users]
+      summary: Get user profile by ID
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  /users/search:
+    get:
+      operationId: searchUsers
+      tags: [users]
+      summary: Search users
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserShortProfile"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+  
+  /users/leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [users]
+      summary: Get rating leaderboard
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: Leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LeaderboardEntry"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+  
+  # Friends endpoints
+  /friends:
+    get:
+      operationId: getFriends
+      tags: [friends]
+      summary: Get user's friends and pending requests
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Friends list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FriendsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    
+    post:
+      operationId: addFriend
+      tags: [friends]
+      summary: Send friend request
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddFriendRequest"
+      responses:
+        "201":
+          description: Friend request sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Friend request already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  /friends/{requestId}:
+    patch:
+      operationId: respondToFriendRequest
+      tags: [friends]
+      summary: Respond to friend request
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RespondToFriendRequest"
+      responses:
+        "200":
+          description: Friend request updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Friend request not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    
+    delete:
+      operationId: removeFriend
+      tags: [friends]
+      summary: Remove friend or cancel friend request
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Friend removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Friend request not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  # Game history
+  /users/me/games:
+    get:
+      operationId: getGameHistory
+      tags: [users]
+      summary: Get current user's game history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: Game history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GameHistory"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
 components:
   schemas:
     HealthStatus:
@@ -94,6 +542,12 @@ components:
           type: ["string", "null"]
         gameState:
           type: ["string", "null"]
+        user1Id:
+          type: ["string", "null"]
+        user2Id:
+          type: ["string", "null"]
+        createdBy:
+          type: ["string", "null"]
       required:
         - id
         - status
@@ -101,3 +555,407 @@ components:
         - currentPlayer
         - winner
         - gameState
+        - user1Id
+        - user2Id
+        - createdBy
+    
+    # Authentication schemas
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        password:
+          type: string
+          minLength: 8
+        displayName:
+          type: string
+          nullable: true
+      required:
+        - email
+        - username
+        - password
+    
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+    
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required:
+        - refreshToken
+    
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+      required:
+        - accessToken
+        - refreshToken
+        - user
+    
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+      required:
+        - accessToken
+        - refreshToken
+    
+    # User schemas
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        timezone:
+          type: string
+          nullable: true
+        rating:
+          type: integer
+        gamesPlayed:
+          type: integer
+        gamesWon:
+          type: integer
+        gamesLost:
+          type: integer
+        gamesDraw:
+          type: integer
+        winRate:
+          type: number
+        role:
+          type: string
+          enum: [user, moderator, admin]
+        emailVerified:
+          type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        preferences:
+          $ref: "#/components/schemas/UserPreferences"
+      required:
+        - id
+        - email
+        - username
+        - rating
+        - gamesPlayed
+        - gamesWon
+        - gamesLost
+        - gamesDraw
+        - winRate
+        - role
+        - emailVerified
+        - isActive
+        - createdAt
+        - preferences
+    
+    UserShortProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        rating:
+          type: integer
+        gamesPlayed:
+          type: integer
+        winRate:
+          type: number
+        isOnline:
+          type: boolean
+      required:
+        - id
+        - username
+        - rating
+        - gamesPlayed
+        - winRate
+        - isOnline
+    
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        timezone:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+    
+    UserPreferences:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, auto]
+        language:
+          type: string
+        notifications:
+          $ref: "#/components/schemas/NotificationPreferences"
+        gameSettings:
+          $ref: "#/components/schemas/GameSettings"
+        privacy:
+          $ref: "#/components/schemas/PrivacySettings"
+    
+    NotificationPreferences:
+      type: object
+      properties:
+        email:
+          type: boolean
+        push:
+          type: boolean
+        friendRequests:
+          type: boolean
+        gameInvites:
+          type: boolean
+    
+    GameSettings:
+      type: object
+      properties:
+        soundVolume:
+          type: integer
+          minimum: 0
+          maximum: 100
+        musicVolume:
+          type: integer
+          minimum: 0
+          maximum: 100
+        animationSpeed:
+          type: string
+          enum: [slow, normal, fast]
+        showHints:
+          type: boolean
+        autoSaveReplays:
+          type: boolean
+    
+    PrivacySettings:
+      type: object
+      properties:
+        profileVisible:
+          type: string
+          enum: [public, friends, private]
+        gameHistoryVisible:
+          type: string
+          enum: [public, friends, private]
+        onlineStatusVisible:
+          type: boolean
+    
+    # Friends schemas
+    Friend:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, accepted, blocked]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/UserShortProfile"
+      required:
+        - id
+        - status
+        - createdAt
+        - updatedAt
+        - user
+    
+    AddFriendRequest:
+      type: object
+      properties:
+        friendId:
+          type: string
+          format: uuid
+      required:
+        - friendId
+    
+    RespondToFriendRequest:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        accept:
+          type: boolean
+      required:
+        - requestId
+        - accept
+    
+    FriendsResponse:
+      type: object
+      properties:
+        friends:
+          type: array
+          items:
+            $ref: "#/components/schemas/Friend"
+        pendingRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/Friend"
+      required:
+        - friends
+        - pendingRequests
+    
+    # Game history
+    GameHistory:
+      type: object
+      properties:
+        gameId:
+          type: string
+        opponent:
+          $ref: "#/components/schemas/UserShortProfile"
+        result:
+          type: string
+          enum: [win, loss, draw]
+        ratingChange:
+          type: integer
+        moves:
+          type: integer
+        duration:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - gameId
+        - opponent
+        - result
+        - ratingChange
+        - moves
+        - duration
+        - createdAt
+    
+    # Leaderboard
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        user:
+          $ref: "#/components/schemas/UserShortProfile"
+        rating:
+          type: integer
+        gamesPlayed:
+          type: integer
+        winRate:
+          type: number
+        streak:
+          type: integer
+          nullable: true
+      required:
+        - rank
+        - user
+        - rating
+        - gamesPlayed
+        - winRate
+        - streak
+    
+    # Pagination
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+    
+    PaginatedResponse:
+      type: object
+      properties:
+        items:
+          type: array
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    
+    # Messages
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

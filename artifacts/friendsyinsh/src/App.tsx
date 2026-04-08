@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Game from "@/pages/game";
+import { GameModeSelectorPage } from "@/components/GameModeSelector";
+import { HotSeatGameProvider } from "@/features/hotseat";
 
 const queryClient = new QueryClient();
 
@@ -13,6 +15,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/game/:roomId/:color" component={Game} />
+      <Route path="/play" component={GameModeSelectorPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -22,9 +25,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <HotSeatGameProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+        </HotSeatGameProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
