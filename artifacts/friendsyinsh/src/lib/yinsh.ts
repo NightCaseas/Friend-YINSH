@@ -64,7 +64,11 @@ export function getEntityAt(state: GameState, q: number, r: number): { type: 'ri
 
 export function getValidMoves(state: GameState, startQ: number, startR: number): HexCoord[] {
   const moves: HexCoord[] = [];
-  if (state.phase !== 'playing') return moves;
+  console.log(`getValidMoves called: start(${startQ}, ${startR}), phase: ${state.phase}`);
+  if (state.phase !== 'playing') {
+    console.log(`Phase is not 'playing', returning empty array`);
+    return moves;
+  }
 
   for (const dir of HEX_DIRECTIONS) {
     let currQ = startQ + dir.q;

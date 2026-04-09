@@ -30,6 +30,7 @@ export interface HotSeatMove {
   player: HotSeatPlayer;
   action: 'placeRing' | 'moveRing' | 'removeRow' | 'removeRing';
   position: { x: number; y: number };
+  targetPosition?: { x: number; y: number };
   timestamp: number;
   notation: string;
 }
@@ -81,6 +82,10 @@ export const HotSeatMoveSchema = z.object({
     x: z.number().int(),
     y: z.number().int(),
   }),
+  targetPosition: z.object({
+    x: z.number().int(),
+    y: z.number().int(),
+  }).optional(),
   timestamp: z.number().int().positive(),
   notation: z.string(),
 });

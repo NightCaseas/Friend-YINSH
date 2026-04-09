@@ -27,11 +27,14 @@ export function createNewHotSeatGame(
   // Определяем цвета игроков случайным образом
   const player1Color: 'white' | 'black' = Math.random() < 0.5 ? 'white' : 'black';
   const player2Color: 'white' | 'black' = player1Color === 'white' ? 'black' : 'white';
+  
+  // Игрок с белым цветом ходит первым
+  const firstPlayer = player1Color === 'white' ? 'player1' : 'player2';
 
   return {
     gameId,
     status: 'active' as const,
-    currentPlayer: 'player1' as const,
+    currentPlayer: firstPlayer,
     players: {
       player1: {
         name: player1Name || 'Player 1',

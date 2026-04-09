@@ -42,15 +42,21 @@ export function useHotSeatGameManager() {
           break;
         
         case 'playing':
+          console.log(`Playing phase click: (${q}, ${r}), selectedRing:`, selectedRing);
           if (!selectedRing) {
             // Выбор кольца для перемещения
             const entity = getEntityAtCell(board, q, r);
+            console.log(`Entity at (${q}, ${r}):`, entity);
             if (entity.type === 'ring' && entity.color === playerColor) {
+              console.log(`Selecting ring at (${q}, ${r})`);
               setSelectedRing({ q, r });
               return;
+            } else {
+              console.log(`Not a valid ring selection: type=${entity.type}, color=${entity.color}, playerColor=${playerColor}`);
             }
           } else {
             // Перемещение выбранного кольца
+            console.log(`Moving ring from (${selectedRing.q}, ${selectedRing.r}) to (${q}, ${r})`);
             action = 'moveRing';
           }
           break;
@@ -70,13 +76,26 @@ export function useHotSeatGameManager() {
 
       // Если действие определено, делаем ход
       if (action) {
-        const move: Omit<HotSeatMove, 'moveNumber' | 'timestamp' | 'notation'> = {
-          player: currentPlayer,
-          action,
-          position: { x: q, y: r },
-        };
+        let move: Omit<HotSeatMove, 'moveNumber' | 'timestamp' | 'notation'>;
+        
+        if (action === 'moveRing' && selectedRing) {
+          move = {
+            player: currentPlayer,
+            action,
+            position: { x: selectedRing.q, y: selectedRing.r },
+            targetPosition: { x: q, y: r }
+          };
+        } else {
+          move = {
+            player: currentPlayer,
+            action,
+            position: { x: q, y: r },
+          };
+        }
 
+        console.log('Making move:', move);
         const success = await context.makeMove(move);
+        console.log('Move result:', success);
         if (!success) {
           setError('Invalid move');
         } else {

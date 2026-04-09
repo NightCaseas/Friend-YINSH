@@ -33,6 +33,8 @@ export function HotSeatBoard({
     getOpponentInfo,
   } = useHotSeatGameManager();
 
+  
+
   // Если нет активной игры, показываем сообщение
   if (!gameState) {
     return (

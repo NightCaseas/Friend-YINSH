@@ -1,5 +1,5 @@
 import { HotSeatGameState, HotSeatMove } from '../types/HotSeatGameState';
-import { GameState, PlayerColor, getValidMoves, findRows, getEntityAt, createInitialState } from '@/lib/yinsh';
+import { GameState, PlayerColor, getValidMoves, findRows, getEntityAt, createInitialState, HEX_DIRECTIONS, isValidCell } from '@/lib/yinsh';
 
 // Валидация хода в hot-seat режиме
 export function validateHotSeatMove(
@@ -59,12 +59,9 @@ export function validateHotSeatMove(
         return { isValid: false, error: 'Select your own ring to move' };
       }
 
-      // Проверяем, есть ли доступные ходы для этого кольца
-      const moves = getValidMoves(board, q, r);
-      if (moves.length === 0) {
-        return { isValid: false, error: 'No valid moves for this ring' };
-      }
-
+      // Не проверяем доступные ходы здесь, так как целевая позиция еще неизвестна
+      // Проверка валидности хода будет в applyHotSeatMove, когда известна targetPosition
+      
       break;
 
     case 'row-removal':
@@ -114,11 +111,22 @@ export function applyHotSeatMove(
   game: HotSeatGameState,
   move: Omit<HotSeatMove, 'moveNumber' | 'timestamp' | 'notation'>
 ): { success: boolean; updatedGame?: HotSeatGameState; error?: string } {
+  console.log('applyHotSeatMove called:', { 
+    action: move.action, 
+    position: move.position,
+    targetPosition: move.targetPosition,
+    player: move.player,
+    gamePhase: game.boardState.phase,
+    gameTurn: game.boardState.turn
+  });
+  
   // Валидируем ход
   const validation = validateHotSeatMove(game, move.player, move.action, move.position);
   if (!validation.isValid) {
+    console.log('Validation failed:', validation.error);
     return { success: false, error: validation.error };
   }
+  console.log('Validation passed');
 
   const { x: q, y: r } = move.position;
   const updatedGame = { ...game };
@@ -137,7 +145,9 @@ export function applyHotSeatMove(
       // Если размещено 10 колец, переходим к фазе игры
       if (board.ringsPlaced >= 10) {
         board.phase = 'playing';
-        // Тот же игрок продолжает ход
+        // После размещения последнего кольца ход переходит другому игроку
+        board.turn = opponentColor;
+        updatedGame.currentPlayer = opponentPlayer;
       } else {
         // Передаем ход следующему игроку
         board.turn = opponentColor;
@@ -147,11 +157,7 @@ export function applyHotSeatMove(
     }
 
     case 'moveRing': {
-      // Здесь нужно обработать движение кольца
-      // В реальной реализации нужно учитывать прыжки через маркеры
-      // Для упрощения предположим, что это валидный ход
-      
-      // Находим и удаляем кольцо из старой позиции
+      // Находим кольцо в старой позиции
       const ringIndex = board.rings.findIndex(ring => 
         ring.q === q && ring.r === r && ring.color === playerColor
       );
@@ -160,16 +166,40 @@ export function applyHotSeatMove(
         return { success: false, error: 'Ring not found' };
       }
 
+      // Получаем новую позицию из действия move
+      const targetPosition = move.targetPosition;
+      if (!targetPosition) {
+        return { success: false, error: 'Target position not specified' };
+      }
+
+      const { x: newX, y: newY } = targetPosition;
+      console.log(`Target position: x=${newX}, y=${newY}`);
+
+      // Проверяем валидность хода
+      const isValid = isValidRingMove(board, q, r, newX, newY, playerColor);
+      if (!isValid) {
+        return { success: false, error: 'Invalid move' };
+      }
+
       // Удаляем кольцо со старой позиции
       board.rings.splice(ringIndex, 1);
 
       // Добавляем маркер на старую позицию
       board.markers = [...board.markers, { color: playerColor, q, r }];
 
-      // Здесь должна быть логика для определения новой позиции кольца
-      // и добавления маркеров на пройденный путь
-      // Для упрощения оставляем заглушку
-      
+      // Добавляем кольцо на новую позицию
+      board.rings.push({ color: playerColor, q: newX, r: newY });
+
+      // Добавляем маркеры на все клетки пути (если есть)
+      const pathMarkers = getPathMarkers(q, r, newX, newY);
+      if (pathMarkers.length > 0) {
+        board.markers = [...board.markers, ...pathMarkers.map(pos => ({ 
+          color: playerColor, 
+          q: pos.q, 
+          r: pos.r 
+        }))];
+      }
+
       // После перемещения кольца проверяем строки
       const rows = findRows(board, playerColor);
       if (rows.length > 0) {
@@ -207,28 +237,115 @@ export function applyHotSeatMove(
     }
 
     case 'removeRing': {
+      console.log(`removeRing: player=${move.player}, playerColor=${playerColor}, opponentPlayer=${opponentPlayer}, opponentColor=${opponentColor}`);
+      
+      // Находим удаляемое кольцо для логирования
+      const removingRing = board.rings.find(ring =>
+        ring.q === q && ring.r === r && ring.color === playerColor
+      );
+      
       // Удаляем кольцо
       board.rings = board.rings.filter(ring =>
         !(ring.q === q && ring.r === r && ring.color === playerColor)
       );
 
-      // Увеличиваем счет соперника
-      updatedGame.players[opponentPlayer].score += 1;
+      // Увеличиваем счет игрока, который удалил свое кольцо
+      console.log(`Increasing score for ${move.player} who removed their ring`);
+      console.log(`Player ${move.player} color: ${playerColor}, removing ring color: ${removingRing?.color}`);
+      updatedGame.players[move.player].score += 1;
 
       // Проверяем, не закончилась ли игра
-      if (updatedGame.players[opponentPlayer].score >= 3) {
+      if (updatedGame.players[move.player].score >= 3) {
         board.phase = 'finished';
         updatedGame.status = 'finished';
       } else {
-        // Возвращаемся к фазе игры
-        board.phase = 'playing';
-        // Передаем ход следующему игроку
-        board.turn = opponentColor;
-        updatedGame.currentPlayer = opponentPlayer;
+        // Проверяем, есть ли строки у противника для удаления
+        const opponentRows = findRows(board, opponentColor);
+        if (opponentRows.length > 0) {
+          board.pendingRemovalRows = opponentRows;
+          board.phase = 'row-removal';
+          // Ход остается у текущего игрока для удаления строки
+        } else {
+          // Проверяем, есть ли строки у текущего игрока для удаления
+          const playerRows = findRows(board, playerColor);
+          if (playerRows.length > 0) {
+            board.pendingRemovalRows = playerRows;
+            board.phase = 'row-removal';
+            // Ход остается у текущего игрока для удаления строки
+          } else {
+            // Возвращаемся к фазе игры
+            board.phase = 'playing';
+            // Передаем ход следующему игроку
+            board.turn = opponentColor;
+            updatedGame.currentPlayer = opponentPlayer;
+          }
+        }
       }
       break;
-    }
+}
+}
+
+// Проверяет валидность перемещения кольца
+function isValidRingMove(
+  board: GameState,
+  fromQ: number,
+  fromR: number,
+  toQ: number,
+  toR: number,
+  playerColor: PlayerColor
+): boolean {
+  console.log(`isValidRingMove: from (${fromQ}, ${fromR}) to (${toQ}, ${toR}), player: ${playerColor}, phase: ${board.phase}`);
+  
+  // Используем уже существующую функцию getValidMoves из yinsh.ts
+  const validMoves = getValidMoves(board, fromQ, fromR);
+  console.log(`Valid moves count: ${validMoves.length}`);
+  console.log('Valid moves:', validMoves);
+  
+  const isValid = validMoves.some(move => move.q === toQ && move.r === toR);
+  console.log(`Move is valid: ${isValid}`);
+  
+  return isValid;
+}
+
+// Получает маркеры на пути между двумя точками
+function getPathMarkers(
+  fromQ: number,
+  fromR: number,
+  toQ: number,
+  toR: number
+): { q: number; r: number }[] {
+  const markers: { q: number; r: number }[] = [];
+  
+  // Вычисляем направление
+  const dq = toQ - fromQ;
+  const dr = toR - fromR;
+  
+  if (dq === 0 && dr === 0) return markers;
+  
+  // Находим шаг для каждой координаты
+  const stepQ = dq === 0 ? 0 : (dq > 0 ? 1 : -1);
+  const stepR = dr === 0 ? 0 : (dr > 0 ? 1 : -1);
+  
+  // Проверяем, что движение прямолинейное (шестиугольная сетка)
+  // В шестиугольной сетке допустимы движения, где q, r или (q+r) постоянны
+  if (!(dq === 0 || dr === 0 || dq === -dr)) {
+    return markers;
   }
+  
+  // Проходим по всем промежуточным клеткам, исключая начальную и конечную
+  let currentQ = fromQ + stepQ;
+  let currentR = fromR + stepR;
+  
+  while (!(currentQ === toQ && currentR === toR)) {
+    // Добавляем все промежуточные клетки
+    markers.push({ q: currentQ, r: currentR });
+    
+    currentQ += stepQ;
+    currentR += stepR;
+  }
+  
+  return markers;
+}
 
   // Обновляем состояние доски
   updatedGame.boardState = board;
