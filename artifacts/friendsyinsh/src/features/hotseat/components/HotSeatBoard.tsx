@@ -1,9 +1,10 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import YinshBoard from '@/components/YinshBoard';
 import { HotSeatGameState } from '../types/HotSeatGameState';
 import { useHotSeatGameManager } from '../hooks/useHotSeatGame';
 import { GameState, PlayerColor } from '@/lib/yinsh';
 import { HotSeatPlayerPanel, PlayerHint } from './HotSeatPlayerPanel';
+import { HotSeatGameOverModal } from './HotSeatGameOverModal';
 
 interface HotSeatBoardProps {
   className?: string;
@@ -295,6 +296,11 @@ export function HotSeatGamePage() {
     resetGame,
     saveGame,
   } = useHotSeatGameManager();
+  const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
+
+  useEffect(() => {
+    setIsWinnerModalOpen(gameState?.status === 'finished');
+  }, [gameState?.gameId, gameState?.status]);
 
   // Если нет активной игры, показываем экран начала
   if (!gameState) {
@@ -357,6 +363,19 @@ export function HotSeatGamePage() {
   const hint = getCurrentHint();
   const isGameActive = gameState.status === 'active';
 
+  const handleNewGameFromModal = async () => {
+    const gameId = await startNewGame({
+      player1Name: gameState.players.player1.name,
+      player2Name: gameState.players.player2.name,
+      boardSize: gameState.settings.boardSize,
+      timeControl: Boolean(gameState.settings.timeControl),
+    });
+
+    if (gameId) {
+      setIsWinnerModalOpen(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 p-4 md:p-6">
       {/* Шапка */}
@@ -399,6 +418,14 @@ export function HotSeatGamePage() {
           compact={false}
         />
       </main>
+
+      {gameState.status === 'finished' && isWinnerModalOpen && (
+        <HotSeatGameOverModal
+          game={gameState}
+          onNewGame={handleNewGameFromModal}
+          onClose={() => setIsWinnerModalOpen(false)}
+        />
+      )}
 
       {/* Футер */}
       <footer className="mt-8 pt-6 border-t border-gray-700">
